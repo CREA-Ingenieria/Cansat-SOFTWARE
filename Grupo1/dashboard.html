@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CanSat Grupo 1 - Estacion Terrena</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8; --green: #4ade80; --red: #f87171; --yellow: #facc15; --orange: #fb923c; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+.header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.header h1 { font-size: 16px; font-weight: 700; letter-spacing: 1px; }
+.header .sub { font-size: 11px; color: var(--muted); }
+.btn { padding: 8px 16px; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; transition: .2s; }
+.btn-wifi { background: #16a34a; color: white; }
+.btn-wifi:hover { background: #15803d; }
+.btn-usb { background: #2563eb; color: white; }
+.btn-usb:hover { background: #1d4ed8; }
+.btn-stop { background: #dc2626; color: white; }
+.btn-stop:hover { background: #b91c1c; }
+.btn-csv { background: var(--card); color: var(--muted); border: 1px solid var(--border); }
+.status { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-off { background: #475569; }
+.dot-on { background: var(--green); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.main { max-width: 1200px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; text-align: center; }
+.card .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.card .value { font-size: 22px; font-weight: 700; font-family: 'Consolas', monospace; }
+.card .unit { font-size: 11px; color: var(--muted); }
+.phase-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.phase-bar .phase { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 1px; border: 2px solid var(--border); color: var(--muted); }
+.phase-bar .phase.active { border-color: var(--accent); color: var(--accent); background: rgba(56,189,248,.1); }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.chart-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.chart-box h3 { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.chart-box canvas { width: 100% !important; height: 200px !important; }
+.console-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.console-box h3 { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+#console { background: #020617; border-radius: 8px; padding: 10px; height: 150px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 11px; color: var(--green); }
+@media (max-width: 700px) { .charts { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>CANSAT GRUPO 1 - ESTACION TERRENA</h1>
+    <div class="sub">ESP32-CAM | MPU6050 + BMP280 | WiFi: CanSat_G1</div>
+  </div>
+  <div class="controls">
+    <div class="status"><span class="dot dot-off" id="statusDot"></span><span id="statusText">Desconectado</span></div>
+    <button class="btn btn-wifi" onclick="connectWiFi()">Conectar WiFi</button>
+    <button class="btn btn-usb" onclick="connectUSB()">Conectar USB</button>
+    <button class="btn btn-stop" onclick="disconnect()" style="display:none" id="btnStop">Desconectar</button>
+    <button class="btn btn-csv" onclick="exportCSV()">Exportar CSV</button>
+    <span style="font-size:11px;color:var(--muted)" id="pktCount">0 paquetes</span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="phase-bar" id="phaseBar">
+    <span style="font-size:11px;font-weight:600;color:var(--muted)">FASE:</span>
+    <span class="phase" data-phase="PAD">PAD</span>
+    <span class="phase" data-phase="ASCENT">ASCENT</span>
+    <span class="phase" data-phase="APOGEE">APOGEE</span>
+    <span class="phase" data-phase="DESCENT">DESCENT</span>
+    <span class="phase" data-phase="LANDED">LANDED</span>
+    <span style="margin-left:auto;font-size:12px;font-weight:700" id="servoStatus">SERVO: --</span>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Altitud</div><div class="value" id="vAlt">--</div><div class="unit">m</div></div>
+    <div class="card"><div class="label">Alt. Max</div><div class="value" id="vAltMax">--</div><div class="unit">m</div></div>
+    <div class="card"><div class="label">Vel. Vert.</div><div class="value" id="vVert">--</div><div class="unit">m/s</div></div>
+    <div class="card"><div class="label">Temperatura</div><div class="value" id="vTemp">--</div><div class="unit">&deg;C</div></div>
+    <div class="card"><div class="label">Presion</div><div class="value" id="vPress">--</div><div class="unit">hPa</div></div>
+    <div class="card"><div class="label">Accel G</div><div class="value" id="vAccelG">--</div><div class="unit">g</div></div>
+    <div class="card"><div class="label">Accel X</div><div class="value" id="vAx">--</div><div class="unit">m/s2</div></div>
+    <div class="card"><div class="label">Accel Y</div><div class="value" id="vAy">--</div><div class="unit">m/s2</div></div>
+    <div class="card"><div class="label">Accel Z</div><div class="value" id="vAz">--</div><div class="unit">m/s2</div></div>
+  </div>
+
+  <div class="charts">
+    <div class="chart-box"><h3>Altitud (m)</h3><canvas id="chartAlt"></canvas></div>
+    <div class="chart-box"><h3>Temperatura (&deg;C) / Presion (hPa)</h3><canvas id="chartTempPress"></canvas></div>
+    <div class="chart-box"><h3>Acelerometro (m/s2)</h3><canvas id="chartAccel"></canvas></div>
+    <div class="chart-box"><h3>Giroscopio (&deg;/s)</h3><canvas id="chartGyro"></canvas></div>
+  </div>
+
+  <div class="console-box">
+    <h3>Consola Serial <button onclick="document.getElementById('console').innerHTML=''" style="float:right;background:var(--border);border:none;color:var(--muted);padding:2px 8px;border-radius:4px;cursor:pointer;font-size:10px">Limpiar</button></h3>
+    <div id="console"></div>
+  </div>
+</div>
+
+<script>
+const MAX_PTS = 150;
+let ws = null, port = null, reader = null, connected = false;
+let history = [];
+let labels = [], dAlt = [], dTemp = [], dPress = [], dAx = [], dAy = [], dAz = [], dGx = [], dGy = [], dGz = [];
+
+const chartOpts = (yTitle) => ({
+  responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
+  scales: { x: { display: false }, y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' }, title: { display: !!yTitle, text: yTitle, color: '#94a3b8' } } },
+  plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12 } } },
+  elements: { point: { radius: 0 }, line: { borderWidth: 1.5 } }
+});
+
+const mkDataset = (label, data, color) => ({ label, data, borderColor: color, backgroundColor: color + '20', fill: false, tension: 0.3 });
+
+const cAlt = new Chart(document.getElementById('chartAlt'), { type: 'line', data: { labels, datasets: [mkDataset('Altitud', dAlt, '#38bdf8')] }, options: chartOpts('m') });
+const cTP = new Chart(document.getElementById('chartTempPress'), { type: 'line', data: { labels, datasets: [mkDataset('Temp', dTemp, '#fb923c'), mkDataset('Presion', dPress, '#a78bfa')] }, options: chartOpts() });
+const cAcc = new Chart(document.getElementById('chartAccel'), { type: 'line', data: { labels, datasets: [mkDataset('X', dAx, '#f87171'), mkDataset('Y', dAy, '#4ade80'), mkDataset('Z', dAz, '#38bdf8')] }, options: chartOpts('m/s2') });
+const cGyro = new Chart(document.getElementById('chartGyro'), { type: 'line', data: { labels, datasets: [mkDataset('X', dGx, '#f87171'), mkDataset('Y', dGy, '#4ade80'), mkDataset('Z', dGz, '#38bdf8')] }, options: chartOpts('deg/s') });
+
+function setConnected(v) {
+  connected = v;
+  document.getElementById('statusDot').className = 'dot ' + (v ? 'dot-on' : 'dot-off');
+  document.getElementById('statusText').textContent = v ? 'Conectado' : 'Desconectado';
+  document.getElementById('btnStop').style.display = v ? '' : 'none';
+}
+
+function processLine(line) {
+  line = line.trim();
+  if (!line) return;
+  const con = document.getElementById('console');
+  con.innerHTML += line + '\n';
+  if (con.scrollHeight > 5000) con.innerHTML = con.innerHTML.slice(-3000);
+  con.scrollTop = con.scrollHeight;
+
+  if (!line.startsWith('{')) return;
+  try {
+    const d = JSON.parse(line);
+    history.push(d);
+    document.getElementById('pktCount').textContent = history.length + ' paquetes';
+
+    document.getElementById('vAlt').textContent = (d.alt ?? 0).toFixed(1);
+    document.getElementById('vAltMax').textContent = (d.altMax ?? 0).toFixed(1);
+    document.getElementById('vVert').textContent = (d.vVert ?? 0).toFixed(2);
+    document.getElementById('vTemp').textContent = (d.temp ?? 0).toFixed(1);
+    document.getElementById('vPress').textContent = (d.press ?? 0).toFixed(1);
+    document.getElementById('vAccelG').textContent = (d.accelG ?? 0).toFixed(2);
+    document.getElementById('vAx').textContent = (d.ax ?? 0).toFixed(2);
+    document.getElementById('vAy').textContent = (d.ay ?? 0).toFixed(2);
+    document.getElementById('vAz').textContent = (d.az ?? 0).toFixed(2);
+
+    document.getElementById('servoStatus').textContent = 'SERVO: ' + (d.servo ? 'DESPLEGADO' : 'CERRADO');
+    document.getElementById('servoStatus').style.color = d.servo ? '#4ade80' : '#94a3b8';
+
+    document.querySelectorAll('#phaseBar .phase').forEach(el => {
+      el.classList.toggle('active', el.dataset.phase === d.phase);
+    });
+
+    const t = ((d.ts || 0) / 1000).toFixed(1);
+    const push = (arr, val) => { arr.push(val); if (arr.length > MAX_PTS) arr.shift(); };
+    push(labels, t); push(dAlt, d.alt || 0); push(dTemp, d.temp || 0); push(dPress, d.press || 0);
+    push(dAx, d.ax || 0); push(dAy, d.ay || 0); push(dAz, d.az || 0);
+    push(dGx, d.gx || 0); push(dGy, d.gy || 0); push(dGz, d.gz || 0);
+
+    cAlt.update(); cTP.update(); cAcc.update(); cGyro.update();
+  } catch (e) {}
+}
+
+function connectWiFi() {
+  if (connected) return;
+  ws = new WebSocket('ws://192.168.4.1:81');
+  ws.onopen = () => setConnected(true);
+  ws.onmessage = (e) => processLine(e.data);
+  ws.onerror = () => alert('Error de conexion WiFi. Verifica estar conectado a la red CanSat_G1');
+  ws.onclose = () => setConnected(false);
+}
+
+async function connectUSB() {
+  if (connected) return;
+  if (!('serial' in navigator)) { alert('Web Serial no soportado. Usa Chrome o Edge.'); return; }
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    setConnected(true);
+    const dec = new TextDecoderStream();
+    port.readable.pipeTo(dec.writable);
+    reader = dec.readable.getReader();
+    let buf = '';
+    while (connected) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      lines.forEach(processLine);
+    }
+  } catch (e) { console.error(e); setConnected(false); }
+}
+
+async function disconnect() {
+  connected = false;
+  if (ws) { ws.close(); ws = null; }
+  if (reader) { try { await reader.cancel(); } catch {} reader = null; }
+  if (port) { try { await port.close(); } catch {} port = null; }
+  setConnected(false);
+}
+
+function exportCSV() {
+  if (!history.length) return;
+  const h = 'id,ts,temp,press,alt,ax,ay,az,gx,gy,gz,phase,servo,vVert,altMax,accelG';
+  const rows = history.map(d => [d.id,d.ts,d.temp,d.press,d.alt,d.ax,d.ay,d.az,d.gx,d.gy,d.gz,d.phase,d.servo,d.vVert,d.altMax,d.accelG].join(','));
+  const blob = new Blob([h + '\n' + rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'CanSat_G1_' + new Date().toISOString().slice(0,10) + '.csv'; a.click();
+}
+</script>
+</body>
+</html>
