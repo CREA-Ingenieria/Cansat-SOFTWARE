@@ -1,0 +1,6 @@
+{
+  "name": "CanSat Control Center",
+  "description": "Real-time aerospace telemetry dashboard for ESP32 CanSat styled in Girl Rescue game theme, featuring BME280, MPU6050, and KY-038 acoustic monitoring",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "CanSat Ground Control Station",
+  "description": "Estación de control terrena en tiempo real para monitoreo de telemetría de CanSat con gráficas, mapa GPS, alertas y simulador de vuelo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
