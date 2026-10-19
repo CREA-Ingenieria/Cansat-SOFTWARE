@@ -11,8 +11,7 @@
 #include <WebSocketsServer.h>
 #include <Wire.h>
 #include <ESP32Servo.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
+#include "mpu6050_direct.h"
 #include <Adafruit_BME280.h>
 
 const char* AP_SSID = "CanSat_G3";
@@ -30,7 +29,6 @@ const char* AP_PASS = "cansat2026g3";
 
 WebSocketsServer ws = WebSocketsServer(81);
 
-Adafruit_MPU6050 mpu;
 Adafruit_BME280 bme;
 Servo servo;
 
@@ -68,11 +66,9 @@ void setup() {
   Wire.begin(I2C_SDA, I2C_SCL);
   pinMode(SOUND_DO, INPUT);
 
-  mpuOK = mpu.begin();
+  mpuOK = initMPU6050();
   if (!mpuOK) Serial.println("Error: MPU6050 no detectado!");
   else {
-    mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
-    mpu.setGyroRange(MPU6050_RANGE_500_DEG);
     Serial.println("MPU6050 OK");
   }
 
@@ -96,10 +92,7 @@ void loop() {
   float temp = 0, press = 1013.25, alt = 0, hum = 0;
 
   if (mpuOK) {
-    sensors_event_t a, g, t;
-    mpu.getEvent(&a, &g, &t);
-    ax = a.acceleration.x; ay = a.acceleration.y; az = a.acceleration.z;
-    gx = g.gyro.x * 180.0 / PI; gy = g.gyro.y * 180.0 / PI; gz = g.gyro.z * 180.0 / PI;
+    if (!readMPU6050(ax, ay, az, gx, gy, gz)) Serial.println("Error de lectura MPU6050");
   }
 
   if (bmeOK) {

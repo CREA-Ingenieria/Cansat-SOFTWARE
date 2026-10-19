@@ -11,8 +11,7 @@
 #include <WebSocketsServer.h>
 #include <Wire.h>
 #include <DHT.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
+#include "mpu6050_direct.h"
 #include <Adafruit_BMP280.h>
 #include <Adafruit_LTR390.h>
 #include <ESP32Servo.h>
@@ -32,7 +31,6 @@ const char* AP_PASS = "cansat2026g4";
 
 WebSocketsServer ws = WebSocketsServer(81);
 
-Adafruit_MPU6050 mpu;
 Adafruit_BMP280 bmp;
 Adafruit_LTR390 ltr = Adafruit_LTR390();
 DHT dht(DHTPIN, DHTTYPE);
@@ -74,7 +72,7 @@ void setup() {
   Wire.begin(I2C_SDA, I2C_SCL);
   dht.begin();
 
-  mpuOK = mpu.begin();
+  mpuOK = initMPU6050();
   if (!mpuOK) Serial.println("Error: MPU6050 no detectado!");
   else Serial.println("MPU6050 OK");
 
@@ -110,9 +108,8 @@ void loop() {
   int uvRaw = 0;
 
   if (mpuOK) {
-    sensors_event_t a, g, t;
-    mpu.getEvent(&a, &g, &t);
-    ax = a.acceleration.x; ay = a.acceleration.y; az = a.acceleration.z;
+    float gx, gy, gz;
+    if (!readMPU6050(ax, ay, az, gx, gy, gz)) Serial.println("Error de lectura MPU6050");
   }
 
   if (bmpOK) {
